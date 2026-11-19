@@ -66,4 +66,63 @@ public class VehicleService {
                 .orElseThrow(() -> new VehicleNotFoundException("Автомобіль з ID=" + id + " не знайдено"));
         vehicleRepository.delete(existing);
     }
+
+    // --- Бізнес-логіка рентабельності та підготовки авто для Lab 2 ---
+
+    @Transactional(readOnly = true)
+    public java.math.BigDecimal calculateProjectedProfit(Long vehicleId, java.math.BigDecimal repairCosts) {
+        if (repairCosts == null || repairCosts.compareTo(java.math.BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("Витрати на ремонт не можуть бути від'ємними");
+        }
+        Vehicle vehicle = vehicleRepository.findById(vehicleId)
+                .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("Автомобіль з ID " + vehicleId + " не знайдено"));
+
+        if (vehicle.getPurchasePrice() == null || vehicle.getTargetResalePrice() == null) {
+            throw new IllegalStateException("Для авто з ID " + vehicleId + " не задана ціна закупки або продажу");
+        }
+
+        return vehicle.getTargetResalePrice()
+                .subtract(vehicle.getPurchasePrice())
+                .subtract(repairCosts);
+    }
+
+    @Transactional(readOnly = true)
+    public java.math.BigDecimal calculateProfitMarginPercent(Long vehicleId, java.math.BigDecimal repairCosts) {
+        Vehicle vehicle = vehicleRepository.findById(vehicleId)
+                .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("Автомобіль з ID " + vehicleId + " не знайдено"));
+
+        if (vehicle.getTargetResalePrice() == null || vehicle.getTargetResalePrice().compareTo(java.math.BigDecimal.ZERO) <= 0) {
+            throw new IllegalStateException("Ціна продажу повинна бути більшою за нуль");
+        }
+
+        java.math.BigDecimal profit = calculateProjectedProfit(vehicleId, repairCosts);
+        return profit.multiply(java.math.BigDecimal.valueOf(100))
+                .divide(vehicle.getTargetResalePrice(), 2, java.math.RoundingMode.HALF_UP);
+    }
+
+    @Transactional(readOnly = true)
+    public boolean isProfitableDeal(Long vehicleId, java.math.BigDecimal repairCosts, java.math.BigDecimal minDesiredProfit) {
+        if (minDesiredProfit == null || minDesiredProfit.compareTo(java.math.BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("Мінімальний бажаний прибуток не може бути від'ємним");
+        }
+        java.math.BigDecimal projectedProfit = calculateProjectedProfit(vehicleId, repairCosts);
+        return projectedProfit.compareTo(minDesiredProfit) >= 0;
+    }
+
+    @Transactional
+    public VehicleResponseDto markReadyForSale(Long vehicleId) {
+        Vehicle vehicle = vehicleRepository.findById(vehicleId)
+                .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("Автомобіль з ID " + vehicleId + " не знайдено"));
+
+        if (vehicle.getStatus() == com.vagcv.garage.domain.VehicleStatus.SOLD) {
+            throw new IllegalStateException("Автомобіль з ID " + vehicleId + " вже продано");
+        }
+        if (vehicle.getTargetResalePrice() == null || vehicle.getTargetResalePrice().compareTo(java.math.BigDecimal.ZERO) <= 0) {
+            throw new IllegalStateException("Неможливо виставити на продаж авто без ціни продажу");
+        }
+
+        vehicle.setStatus(com.vagcv.garage.domain.VehicleStatus.READY_FOR_SALE);
+        vehicle.setUpdatedAt(java.time.LocalDateTime.now());
+        return vehicleMapper.toDto(vehicleRepository.save(vehicle));
+    }
 }
