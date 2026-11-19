@@ -1,85 +1,44 @@
-# Звіт до Лабораторної роботи №3
-**Тема:** Розробка та застосування кастомних анотацій у Spring Boot застосунку  
+# Звіт до Лабораторної роботи №4
+**Тема:** Aspect-Oriented Programming (AOP) у Spring Boot  
 **Проєкт:** VAG.CV Fleet & Garage Platform (`com.vagcv.garage`)  
-**Гілка репозиторію:** `Lab3`
+**Гілка репозиторію:** `Lab4`
 
 ---
 
 ## 1. Мета роботи
-Спроєктувати, реалізувати та протестувати три кастомні анотації різних архітектурних механізмів Spring Boot / Jakarta EE у предметній області обліку та перепродажу автомобілів:
-1. **Bean Validation Constraint** (`@ProfitableResaleDeal`) — декларативна валідація бізнес-інваріантів на рівні класу DTO.
-2. **Композитна мета-анотація** (`@FleetCreatedPostMapping`) — усунення дублювання веб-конфігурації контролера через композицію та `@AliasFor`.
-3. **Кастомний MVC Argument Resolver** (`@CurrentOperator`) — автоматичне витягування контексту поточного оператора із запиту без дублювання коду в ендпоінтах.
+Реалізувати наскрізну функціональність (cross-cutting concerns) у вигляді 3 пар «власна анотація + Spring AOP аспект» різних типів Advice (`@Around`, `@AfterReturning`, `@Before`), продемонструвати різницю між зовнішнім викликом через Spring Proxy та внутрішнім самовикликом (`self-invocation`), а також покрити аспекти модульними та інтеграційними тестами.
 
 ---
 
-## 2. Архітектура та реалізація кастомних анотацій
+## 2. Реалізовані анотації та аспекти (`com.vagcv.garage.aop`)
 
-### 2.1. Тип 1: Bean Validation Constraint — `@ProfitableResaleDeal`
-* **Файли:**
-    * `src/main/java/com/vagcv/garage/annotation/ProfitableResaleDeal.java`
-    * `src/main/java/com/vagcv/garage/annotation/ProfitableResaleDealValidator.java`
-    * Застосовано до: `src/main/java/com/vagcv/garage/dto/VehicleRequestDto.java`
-* **Механізм роботи:**  
-  Анотація оголошена з `@Target(ElementType.TYPE)` та `@Constraint(validatedBy = ProfitableResaleDealValidator.class)`, що дозволяє валідатору аналізувати взаємозв'язок між кількома полями DTO одночасно (`purchasePrice`, `targetResalePrice`, `status`).
-* **Бізнес-правила:**
-    1. Очікуваний чистий спред (`targetResalePrice - purchasePrice`) повинен бути не меншим за конфігурований параметр `minProfit` (за замовчуванням `200.00`).
-    2. Якщо автомобіль створюється/оновлюється у статусі `SOLD`, ціна продажу не може бути нижчою за ціну закупівлі (заборона фіксації збиткового продажу).
-    3. У разі порушення стандартне повідомлення вимикається (`disableDefaultConstraintViolation()`) і формується деталізований `ConstraintViolation` із прив'язкою до поля `targetResalePrice` та розрахунком мінімально необхідної ціни продажу.
+### 2.1. `@TrackExecutionSla` + `ExecutionSlaAspect` (`@Around`)
+* **Призначення:** моніторинг часу виконання бізнес-операцій із контролем порогу SLA (`maxMillis`).
+* **Де застосовано:** `VehicleService.createVehicle(...)` (`maxMillis = 250L`).
+* **Логіка роботи:** вимірює тривалість виконання `joinPoint.proceed()` через `System.nanoTime()`, записує метрику `SlaMetric` у потокобезпечний реєстр `DealAuditRegistry` навіть у разі викидання винятку (блок `finally`) та логує попередження при перевищенні ліміту SLA.
 
----
+### 2.2. `@AuditDealOperation` + `DealAuditAspect` (`@AfterReturning`)
+* **Призначення:** аудит ключових змін статусу автомобіля на майданчику.
+* **Де застосовано:** `VehicleService.markReadyForSale(Long vehicleId)` (`action = "MARK_READY_FOR_SALE"`).
+* **Логіка роботи:** після успішного повернення `VehicleResponseDto` витягує поточного користувача із `SecurityContextHolder` та зберігає запис `AuditEntry` (дія, ID авто, VIN, оператор, мітка часу) у `DealAuditRegistry`.
 
-### 2.2. Тип 2: Композитна анотація (Composed Meta-Annotation) — `@FleetCreatedPostMapping`
-* **Файли:**
-    * `src/main/java/com/vagcv/garage/annotation/FleetCreatedPostMapping.java`
-    * Застосовано у: `src/main/java/com/vagcv/garage/controller/VehicleRestController.java` (`createVehicle`)
-* **Механізм роботи:**  
-  Об'єднує дві анотації, які регулярно застосовуються разом для POST-ендпоінтів створення сутностей:
-    * `@RequestMapping(method = RequestMethod.POST)`
-    * `@ResponseStatus(HttpStatus.CREATED)`
-      Для прозорого налаштування маршрутів використано `@AliasFor(annotation = RequestMapping.class, attribute = "value")` та `@AliasFor(..., attribute = "path")`, що забезпечує ідентичну поведінку з окремим застосуванням оригінальних анотацій.
+### 2.3. `@GuardHighValueResale` + `HighValueResaleGuardAspect` (`@Before`)
+* **Призначення:** контроль доступу перед виставленням преміальних автомобілів дорожче заданого порогу (`threshold = 10000.00`).
+* **Де застосовано:** `VehicleService.createVehicle(...)`.
+* **Логіка роботи:** до виконання методу перевіряє аргумент `VehicleRequestDto.targetResalePrice`. Якщо сума перевищує поріг, а поточний користувач не має ролі `ROLE_ADMIN`, аспект блокує виконання винятком `AccessDeniedException`.
 
 ---
 
-### 2.3. Тип 3: Кастомний резолвер аргументів Spring MVC — `@CurrentOperator`
-* **Файли:**
-    * `src/main/java/com/vagcv/garage/annotation/CurrentOperator.java`
-    * `src/main/java/com/vagcv/garage/annotation/CurrentOperatorArgumentResolver.java`
-    * Реєстрація у MVC: `src/main/java/com/vagcv/garage/config/WebMvcConfig.java`
-    * Застосовано у: `VehicleRestController.createVehicle(..., @CurrentOperator String operator)`
-* **Механізм роботи:**  
-  `CurrentOperatorArgumentResolver` реалізує інтерфейс `HandlerMethodArgumentResolver` і підключається через `WebMvcConfigurer.addArgumentResolvers(...)`:
-    1. `supportsParameter(...)` повертає `true` виключно для параметрів типу `String`, позначених анотацією `@CurrentOperator`.
-    2. `resolveArgument(...)` послідовно перевіряє:
-        * автентифікований `Authentication` у `SecurityContextHolder` (витягує `auth.getName()`);
-        * HTTP-заголовок `X-Operator` (якщо запит виконано без JWT-контексту);
-        * значення `fallback` з атрибута анотації (за замовчуванням `"api_user"`).
-    3. Отримане ім'я оператора передається безпосередньо в бізнес-сервіс `vehicleService.createVehicle(requestDto, operator)` і фіксується в полі `createdBy` збереженої сутності `Vehicle`.
+## 3. Демонстрація проблеми самовиклику (`self-invocation`)
+У класі `VehicleService` реалізовано два шляхи виклику анотованого методу `markReadyForSale(Long vehicleId)`:
+1. **Зовнішній виклик** (`vehicleService.markReadyForSale(id)` із контролера або тесту): звернення проходить через обгортку **Spring AOP Proxy**, тому `@AuditDealOperation` спрацьовує та створює запис у `DealAuditRegistry`.
+2. **Внутрішній самовиклик** (`vehicleService.prepareAndPublishInternal(id)` $\rightarrow$ `this.markReadyForSale(id)`): виклик виконується напряму через посилання `this` на цільовий об'єкт, оминаючи проксі. Статус авто оновлюється у БД без помилок, але `DealAuditAspect` **не активується** (свідома демонстрація обмеження proxy-based AOP).
 
 ---
 
-## 3. Верифікація Acceptance Criteria (Матриця покриття тестами)
+## 4. Верифікація тестами
 
-Усі 8 критеріїв приймання перевірено автоматизованими тестами у класі `src/test/java/com/vagcv/garage/unit/Lab3CustomAnnotationsTest.java`:
-
-| Критерій | Механізм | Тестовий метод у `Lab3CustomAnnotationsTest` | Очікуваний та фактичний результат |
-| :--- | :--- | :--- | :--- |
-| **AC 1** | Bean Validation (`@Constraint`) | `profitableResaleDeal_ValidMargin_ShouldPassValidation` | Jakarta `Validator` автоматично знаходить `ProfitableResaleDealValidator` без ручного створення екземпляра |
-| **AC 2** | Bean Validation (позитивний кейс) | `profitableResaleDeal_ValidMargin_ShouldPassValidation` | При маржі `700.00 >= 200.00` список `ConstraintViolation` порожній (`isEmpty() == true`) |
-| **AC 3** | Bean Validation (негативний кейс) | `profitableResaleDeal_InsufficientMargin_ShouldFailWithClearMessage` / `createVehicleEndpoint_InvalidDeal_ShouldReturnBadRequest` | Виникає порушення на полі `targetResalePrice` із точним поясненням (`80.00 < 200.00`, поріг `6700.00`), HTTP-запит повертає `400 Bad Request` |
-| **AC 4** | Meta-Annotation (`@AliasFor`) | `createVehicleEndpoint_ShouldApplyMetaAnnotationAndInjectOperator` | Композитна анотація `@FleetCreatedPostMapping` коректно маршрутизує `POST /api/vehicles` |
-| **AC 5** | Meta-Annotation (`MockMvc`) | `createVehicleEndpoint_ShouldApplyMetaAnnotationAndInjectOperator` | Повертається статус `201 Created`, ідентичний до окремого використання `@PostMapping` + `@ResponseStatus(HttpStatus.CREATED)` |
-| **AC 6** | `supportsParameter(...)` | `currentOperatorResolver_SupportsParameter_ShouldCheckAnnotationAndType` | Повертає `true` для `@CurrentOperator String operator` і `false` для `@RequestBody VehicleRequestDto` |
-| **AC 7** | `resolveArgument(...)` | `currentOperatorResolver_ResolveArgument_ShouldExtractAuthenticatedUser` | Коректно витягує `"bohdan_admin"` із `SecurityContextHolder` |
-| **AC 8** | Інтеграція в контролері | `createVehicleEndpoint_ShouldApplyMetaAnnotationAndInjectOperator` | Резолвлене значення `"taras_mechanic"` передається у `vehicleService.createVehicle(...)` і повертається у JSON (`$.createdBy`) |
-
----
-
-## 4. Інструкція із запуску та перевірки
-
-```bash
-# Переключення на гілку лабораторної роботи
-git checkout Lab3
-
-# Запуск усіх модульних та інтеграційних тестів (включно з Lab3CustomAnnotationsTest)
-./mvnw test
+| Тестовий клас | Тип тесту | Що перевіряє |
+| :--- | :--- | :--- |
+| `ExecutionSlaAspectUnitTest` | Прямий Unit-тест без Spring (`mock(ProceedingJoinPoint.class)`) | Виклик `proceed()`, обчислення часу, фіксацію порушення SLA (`slaViolated = true`), роботу блоку `finally` при винятку |
+| `Lab4AopProxyAndSelfInvocationTest` | Інтеграційний тест (`@SpringBootTest`) | Спрацювання `@AuditDealOperation` через проксі, відсутність спрацювання при `this.markReadyForSale()`, блокування операції аспектом `@GuardHighValueResale` для `ROLE_MECHANIC` |

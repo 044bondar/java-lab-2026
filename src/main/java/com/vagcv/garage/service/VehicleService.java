@@ -10,6 +10,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.vagcv.garage.aop.AuditDealOperation;
+import com.vagcv.garage.aop.GuardHighValueResale;
+import com.vagcv.garage.aop.TrackExecutionSla;
 
 import java.util.List;
 
@@ -33,7 +36,8 @@ public class VehicleService {
                 .orElseThrow(() -> new VehicleNotFoundException("Автомобіль з ID=" + id + " не знайдено"));
         return vehicleMapper.toDto(vehicle);
     }
-
+    @TrackExecutionSla(operationName = "CREATE_VEHICLE", maxMillis = 250L)
+    @GuardHighValueResale(threshold = 10000.00)
     @Transactional
     public VehicleResponseDto createVehicle(VehicleRequestDto requestDto, String operatorName) {
         if (vehicleRepository.existsByVin(requestDto.getVin())) {
@@ -108,7 +112,7 @@ public class VehicleService {
         java.math.BigDecimal projectedProfit = calculateProjectedProfit(vehicleId, repairCosts);
         return projectedProfit.compareTo(minDesiredProfit) >= 0;
     }
-
+    @AuditDealOperation(action = "MARK_READY_FOR_SALE")
     @Transactional
     public VehicleResponseDto markReadyForSale(Long vehicleId) {
         Vehicle vehicle = vehicleRepository.findById(vehicleId)
@@ -124,5 +128,11 @@ public class VehicleService {
         vehicle.setStatus(com.vagcv.garage.domain.VehicleStatus.READY_FOR_SALE);
         vehicle.setUpdatedAt(java.time.LocalDateTime.now());
         return vehicleMapper.toDto(vehicleRepository.save(vehicle));
+    }
+    @Transactional
+    public VehicleResponseDto prepareAndPublishInternal(Long vehicleId) {
+        // Навмисний самовиклик (self-invocation): виклик через this оминає Spring AOP Proxy,
+        // тому @AuditDealOperation на markReadyForSale НЕ спрацьовує
+        return this.markReadyForSale(vehicleId);
     }
 }
