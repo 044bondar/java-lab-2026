@@ -1,0 +1,28 @@
+### 01. Отримати JWT токен ADMIN
+GET http://localhost:8080/api/auth/dev-token?username=bohdan_admin&roles=ADMIN,MECHANIC
+
+> {% client.global.set("admin_token", response.body.access_token); %}
+
+### 02. Отримати JWT токен MECHANIC
+GET http://localhost:8080/api/auth/dev-token?username=taras_mechanic&roles=MECHANIC
+
+> {% client.global.set("mechanic_token", response.body.access_token); %}
+
+### 03. GET /api/vehicles БЕЗ токена -> 401 Unauthorized
+GET http://localhost:8080/api/vehicles
+
+### 04. GET /api/vehicles З JWT (MECHANIC) -> 200 OK
+GET http://localhost:8080/api/vehicles
+Authorization: Bearer {{mechanic_token}}
+
+### 07. SecurityFilterChain: MECHANIC -> /api/admin/stats -> 403 Forbidden
+GET http://localhost:8080/api/admin/stats
+Authorization: Bearer {{mechanic_token}}
+
+### 09. @PreAuthorize: MECHANIC -> DELETE /api/vehicles/2 -> 403 Forbidden
+DELETE http://localhost:8080/api/vehicles/2
+Authorization: Bearer {{mechanic_token}}
+
+### 10. @PreAuthorize: ADMIN -> DELETE /api/vehicles/2 -> 204 No Content
+DELETE http://localhost:8080/api/vehicles/2
+Authorization: Bearer {{admin_token}}

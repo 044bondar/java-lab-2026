@@ -1,0 +1,5 @@
+databaseChangeLog:
+  - include:
+      file: db/changelog/001-create-vehicles-table.yaml
+  - include:
+      file: db/changelog/002-seed-initial-vehicles.yaml

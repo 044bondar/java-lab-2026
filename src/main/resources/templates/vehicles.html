@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Автопарк гаража — VAG.CV</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background: #f8f9fa; color: #212529; margin: 0; padding: 24px; }
+        .header { display: flex; justify-content: space-between; align-items: center; background: #1e2227; color: white; padding: 16px 24px; border-radius: 8px; margin-bottom: 24px; }
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); margin-bottom: 32px; }
+        th, td { padding: 12px 16px; border-bottom: 1px solid #dee2e6; text-align: left; }
+        th { background: #343a40; color: white; }
+        .form-box { background: white; padding: 24px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); max-width: 700px; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        input, select { width: 100%; padding: 8px; border: 1px solid #ced4da; border-radius: 4px; box-sizing: border-box; }
+        button { padding: 10px 18px; background: #2b8a3e; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: 600; }
+        .btn-del { background: #c92a2a; padding: 6px 12px; }
+        .error { color: #c92a2a; font-size: 0.9em; margin-top: 4px; }
+    </style>
+</head>
+<body>
+<div class="header">
+    <div><strong>VAG.CV Garage Management</strong> | Оператор: <span th:text="${username}">User</span></div>
+    <form th:action="@{/logout}" method="post" style="margin:0;">
+        <button type="submit" style="background:#495057;">Вийти</button>
+    </form>
+</div>
+
+<h2>Автомобілі в роботі</h2>
+<table>
+    <thead>
+    <tr>
+        <th>ID</th>
+        <th>VIN</th>
+        <th>Авто</th>
+        <th>Рік</th>
+        <th>Закупка ($)</th>
+        <th>Цільова ($)</th>
+        <th>Очікуваний прибуток ($)</th>
+        <th>Статус</th>
+        <th>Дії</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr th:each="v : ${vehicles}">
+        <td th:text="${v.id}">1</td>
+        <td th:text="${v.vin}">VIN</td>
+        <td th:text="${v.brand + ' ' + v.model}">VW Passat B6</td>
+        <td th:text="${v.manufactureYear}">2008</td>
+        <td th:text="${v.purchasePrice}">6500</td>
+        <td th:text="${v.targetResalePrice}">8400</td>
+        <td th:text="${v.expectedProfit}">1900</td>
+        <td th:text="${v.status}">IN_RESTORATION</td>
+        <td>
+            <form th:action="@{/ui/vehicles/{id}/delete(id=${v.id})}" method="post">
+                <button type="submit" class="btn-del">Видалити (ADMIN)</button>
+            </form>
+        </td>
+    </tr>
+    </tbody>
+</table>
+
+<div class="form-box">
+    <h3>Додати новий автомобіль</h3>
+    <form th:action="@{/ui/vehicles}" th:object="${newVehicle}" method="post">
+        <div class="grid">
+            <div>
+                <label>VIN (17 символів)</label>
+                <input type="text" th:field="*{vin}" placeholder="WVWZZZ3CZ8E000111" required/>
+            </div>
+            <div>
+                <label>Марка</label>
+                <input type="text" th:field="*{brand}" placeholder="Volkswagen" required/>
+            </div>
+            <div>
+                <label>Модель</label>
+                <input type="text" th:field="*{model}" placeholder="Golf GTI" required/>
+            </div>
+            <div>
+                <label>Рік випуску</label>
+                <input type="number" th:field="*{manufactureYear}" value="2010" required/>
+            </div>
+            <div>
+                <label>Пробіг (км)</label>
+                <input type="number" th:field="*{mileageKm}" value="180000" required/>
+            </div>
+            <div>
+                <label>Статус</label>
+                <select th:field="*{status}">
+                    <option th:each="st : ${statuses}" th:value="${st}" th:text="${st}"></option>
+                </select>
+            </div>
+            <div>
+                <label>Ціна закупівлі ($)</label>
+                <input type="number" step="0.01" th:field="*{purchasePrice}" value="5000" required/>
+            </div>
+            <div>
+                <label>Цільова ціна продажу ($)</label>
+                <input type="number" step="0.01" th:field="*{targetResalePrice}" value="6200" required/>
+            </div>
+        </div>
+        <div th:if="${#fields.hasErrors('*')}" class="error">
+            <ul>
+                <li th:each="err : ${#fields.errors('*')}" th:text="${err}"></li>
+            </ul>
+        </div>
+        <br/>
+        <button type="submit">Зберегти автомобіль</button>
+    </form>
+</div>
+</body>
+</html>

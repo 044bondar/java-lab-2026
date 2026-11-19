@@ -1,0 +1,29 @@
+databaseChangeLog:
+  - changeSet:
+      id: 002-seed-initial-vehicles
+      author: bohdan.kvasnyuk
+      changes:
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: vin, value: "WVWZZZ3CZ7E123456" }
+              - column: { name: brand, value: "Volkswagen" }
+              - column: { name: model, value: "Passat B6 3.6 VR6" }
+              - column: { name: manufacture_year, valueNumeric: 2008 }
+              - column: { name: mileage_km, valueNumeric: 215000 }
+              - column: { name: purchase_price, valueNumeric: 6500.00 }
+              - column: { name: target_resale_price, valueNumeric: 8400.00 }
+              - column: { name: status, value: "IN_RESTORATION" }
+              - column: { name: created_by, value: "system_seed" }
+        - insert:
+            tableName: vehicles
+            columns:
+              - column: { name: vin, value: "XTA21130084567890" }
+              - column: { name: brand, value: "VAZ" }
+              - column: { name: model, value: "2113 Samara" }
+              - column: { name: manufacture_year, valueNumeric: 2009 }
+              - column: { name: mileage_km, valueNumeric: 164000 }
+              - column: { name: purchase_price, valueNumeric: 1450.00 }
+              - column: { name: target_resale_price, valueNumeric: 2100.00 }
+              - column: { name: status, value: "READY_FOR_SALE" }
+              - column: { name: created_by, value: "system_seed" }

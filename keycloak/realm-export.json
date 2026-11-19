@@ -1,0 +1,49 @@
+{
+  "realm": "garage-realm",
+  "enabled": true,
+  "sslRequired": "none",
+  "roles": {
+    "realm": [
+      { "name": "ADMIN", "description": "Адміністратор автогаража" },
+      { "name": "MECHANIC", "description": "Механік / оператор" }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "garage-app",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "garage-secret-key",
+      "redirectUris": ["http://localhost:8080/*"],
+      "webOrigins": ["http://localhost:8080"],
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "publicClient": false,
+      "protocol": "openid-connect"
+    }
+  ],
+  "users": [
+    {
+      "username": "admin_user",
+      "enabled": true,
+      "email": "admin@vagcv.local",
+      "firstName": "Bohdan",
+      "lastName": "Admin",
+      "credentials": [
+        { "type": "password", "value": "admin123", "temporary": false }
+      ],
+      "realmRoles": ["ADMIN", "MECHANIC"]
+    },
+    {
+      "username": "mechanic_user",
+      "enabled": true,
+      "email": "mechanic@vagcv.local",
+      "firstName": "Taras",
+      "lastName": "Mechanic",
+      "credentials": [
+        { "type": "password", "value": "mech123", "temporary": false }
+      ],
+      "realmRoles": ["MECHANIC"]
+    }
+  ]
+}

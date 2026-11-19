@@ -1,0 +1,255 @@
+{
+  "info": {
+    "name": "VAG.CV Fleet Garage - Lab 1 (Spring Security)",
+    "_postman_id": "a1b2c3d4-1111-2222-3333-444455556666",
+    "description": "Колекція запитів для захисту Лабораторної роботи №1 (JWT автентифікація, CRUD, перевірка ролей SecurityFilterChain та @PreAuthorize).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "admin_token",
+      "value": ""
+    },
+    {
+      "key": "mechanic_token",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "01. Отримати JWT токен ADMIN (автозбереження в {{admin_token}})",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+              "var jsonData = pm.response.json();",
+              "pm.collectionVariables.set('admin_token', jsonData.access_token);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/auth/dev-token?username=bohdan_admin&roles=ADMIN,MECHANIC"
+      }
+    },
+    {
+      "name": "02. Отримати JWT токен MECHANIC (автозбереження в {{mechanic_token}})",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });",
+              "var jsonData = pm.response.json();",
+              "pm.collectionVariables.set('mechanic_token', jsonData.access_token);"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/auth/dev-token?username=taras_mechanic&roles=MECHANIC"
+      }
+    },
+    {
+      "name": "03. GET /api/vehicles БЕЗ токена -> очікується 401 Unauthorized",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Unauthorized 401 without JWT', function () { pm.response.to.have.status(401); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "url": "{{baseUrl}}/api/vehicles"
+      }
+    },
+    {
+      "name": "04. GET /api/vehicles З JWT (MECHANIC) -> 200 OK (дані з Liquibase)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () { pm.response.to.have.status(200); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{mechanic_token}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/vehicles"
+      }
+    },
+    {
+      "name": "05. POST /api/vehicles (CRUD Create) -> 201 Created",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Created 201', function () { pm.response.to.have.status(201); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{mechanic_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"vin\": \"WVWZZZ1KZ9W111222\",\n  \"brand\": \"Volkswagen\",\n  \"model\": \"Golf 5 GTI\",\n  \"manufactureYear\": 2008,\n  \"mileageKm\": 195000,\n  \"purchasePrice\": 6000.00,\n  \"targetResalePrice\": 7400.00,\n  \"status\": \"IN_RESTORATION\"\n}"
+        },
+        "url": "{{baseUrl}}/api/vehicles"
+      }
+    },
+    {
+      "name": "06. PUT /api/vehicles/1 (CRUD Update) -> 200 OK",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{mechanic_token}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"vin\": \"WVWZZZ3CZ7E123456\",\n  \"brand\": \"Volkswagen\",\n  \"model\": \"Passat B6 3.6 VR6 R-Line\",\n  \"manufactureYear\": 2008,\n  \"mileageKm\": 216000,\n  \"purchasePrice\": 6500.00,\n  \"targetResalePrice\": 8900.00,\n  \"status\": \"READY_FOR_SALE\"\n}"
+        },
+        "url": "{{baseUrl}}/api/vehicles/1"
+      }
+    },
+    {
+      "name": "07. SecurityFilterChain: MECHANIC -> /api/admin/stats -> 403 Forbidden",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Forbidden 403 by SecurityFilterChain', function () { pm.response.to.have.status(403); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{mechanic_token}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/admin/stats"
+      }
+    },
+    {
+      "name": "08. SecurityFilterChain: ADMIN -> /api/admin/stats -> 200 OK",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Allowed 200 for ADMIN', function () { pm.response.to.have.status(200); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/admin/stats"
+      }
+    },
+    {
+      "name": "09. @PreAuthorize: MECHANIC -> DELETE /api/vehicles/2 -> 403 Forbidden",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Forbidden 403 by @PreAuthorize', function () { pm.response.to.have.status(403); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{mechanic_token}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/vehicles/2"
+      }
+    },
+    {
+      "name": "10. @PreAuthorize: ADMIN -> DELETE /api/vehicles/2 -> 204 No Content",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Deleted 204 for ADMIN', function () { pm.response.to.have.status(204); });"
+            ],
+            "type": "text/javascript"
+          }
+        }
+      ],
+      "request": {
+        "method": "DELETE",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}"
+          }
+        ],
+        "url": "{{baseUrl}}/api/vehicles/2"
+      }
+    }
+  ]
+}

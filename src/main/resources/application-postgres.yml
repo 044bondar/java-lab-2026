@@ -1,0 +1,6 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/garage_db
+    driver-class-name: org.postgresql.Driver
+    username: garage_user
+    password: garage_password
