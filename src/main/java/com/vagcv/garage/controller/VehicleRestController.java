@@ -1,12 +1,13 @@
 package com.vagcv.garage.controller;
 
+import com.vagcv.garage.annotation.CurrentOperator;
+import com.vagcv.garage.annotation.FleetCreatedPostMapping;
 import com.vagcv.garage.dto.VehicleRequestDto;
 import com.vagcv.garage.dto.VehicleResponseDto;
 import com.vagcv.garage.service.VehicleService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -28,12 +29,10 @@ public class VehicleRestController {
         return vehicleService.getVehicleById(id);
     }
 
-    @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
+    @FleetCreatedPostMapping
     public VehicleResponseDto createVehicle(
             @Valid @RequestBody VehicleRequestDto requestDto,
-            Authentication authentication) {
-        String operator = (authentication != null) ? authentication.getName() : "api_user";
+            @CurrentOperator(fallback = "api_user") String operator) {
         return vehicleService.createVehicle(requestDto, operator);
     }
 

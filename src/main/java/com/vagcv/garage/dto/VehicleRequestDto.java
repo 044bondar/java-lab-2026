@@ -3,6 +3,7 @@ package com.vagcv.garage.dto;
 import com.vagcv.garage.domain.VehicleStatus;
 import jakarta.validation.constraints.*;
 import lombok.*;
+import com.vagcv.garage.annotation.ProfitableResaleDeal;
 
 import java.math.BigDecimal;
 
@@ -10,6 +11,7 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@ProfitableResaleDeal(minProfit = 200.00)
 public class VehicleRequestDto {
 
     @NotBlank(message = "VIN-код обов'язковий")
